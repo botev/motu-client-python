@@ -28,19 +28,18 @@
 
 import logging
 import re
-import urllib
-import datetime
 
-import utils_http
-import utils_messages
-import utils_html
-import utils_log
-import utils_collection
+from . import utils_http
+from . import utils_messages
+from . import utils_html
+from . import utils_log
+from . import utils_collection
 
-from urlparse import parse_qs, urlparse
-    
+from urllib.parse import parse_qs, urlparse, urlencode, quote_plus
+
 # pattern used to search for a CAS url within a response
 CAS_URL_PATTERN = '(.*)/login.*'
+
 
 def authenticate_CAS_for_URL(url, user, pwd, **url_config):
     """Performs a CAS authentication for the given URL service and returns
@@ -57,45 +56,47 @@ def authenticate_CAS_for_URL(url, user, pwd, **url_config):
     url: the url of the service to invoke
     user: the username
     pwd: the password"""
-    
-    log = logging.getLogger("utils_cas:authenticate_CAS_for_URL")
-    
-    server, sep, options = url.partition( '?' )
-    
-    log.info( 'Authenticating user %s for service %s' % (user,server) )      
-    
-    connexion = utils_http.open_url(url,**url_config)
 
-    # connexion response code must be a redirection, else, there's an error (user can't be already connected since no cookie or ticket was sent)
+    log = logging.getLogger("utils_cas:authenticate_CAS_for_URL")
+
+    server, sep, options = url.partition('?')
+
+    log.info('Authenticating user %s for service %s' % (user, server))
+
+    connexion = utils_http.open_url(url, **url_config)
+
+    # connexion response code must be a redirection, else, there's an error
+    # (user can't be already connected since no cookie or ticket was sent)
     if connexion.url == url:
-        raise Exception(utils_messages.get_external_messages()['motu-client.exception.authentication.not-redirected'] % server )
-    
+        raise Exception(
+            utils_messages.get_external_messages()['motu-client.exception.authentication.not-redirected'] % server)
+
     # find the cas url from the redirected url
     redirected_url = connexion.url
     p = parse_qs(urlparse(connexion.url).query, keep_blank_values=False)
-    redirectServiceUrl = p['service'][0]
-    
-    
+    redirect_service_url = p['service'][0]
+
     m = re.search(CAS_URL_PATTERN, redirected_url)
-    
+
     if m is None:
-        raise Exception(utils_messages.get_external_messages()['motu-client.exception.authentication.unfound-url'] % redirected_url)
-    
+        raise Exception(
+            utils_messages.get_external_messages()['motu-client.exception.authentication.unfound-url'] % redirected_url)
+
     url_cas = m.group(1) + '/v1/tickets'
 
-    opts = utils_http.encode(utils_collection.ListMultimap(username = urllib.quote(user), password = urllib.quote(pwd))) 
+    opts = urlencode(dict(username=user, password=pwd))
 
-    utils_log.log_url( log, "login user into CAS:\t", url_cas+'?'+opts )
-    url_config['data']=opts
+    utils_log.log_url(log, "login user into CAS:\t", url_cas + '?' + opts)
+    url_config['data'] = opts
     connexion = utils_http.open_url(url_cas, **url_config)
 
     fp = utils_html.FounderParser()
     for line in connexion:
-        log.log( utils_log.TRACE_LEVEL, 'utils_html.FounderParser() line: %s', line )
-        fp.feed(line)
-        
+        log.log(utils_log.TRACE_LEVEL, 'utils_html.FounderParser() line: %s', line)
+        fp.feed(line.decode("utf-8"))
+
     tgt = fp.action_[fp.action_.rfind('/') + 1:]
-    log.log( utils_log.TRACE_LEVEL, 'TGT: %s', tgt )
+    log.log(utils_log.TRACE_LEVEL, 'TGT: %s', tgt)
 
     # WARNING : don't use 'fp.action_' as url : it seems protocol is always http never https 
     # use 'url_cas', extract TGT from 'fp.action_' , then construct url_ticket.
@@ -104,22 +105,20 @@ def authenticate_CAS_for_URL(url, user, pwd, **url_config):
 
     if url_ticket is None:
         raise Exception(utils_messages.get_external_messages()['motu-client.exception.authentication.tgt'])
-    
-    utils_log.log_url( log, "found url ticket:\t",url_ticket)
 
-    opts = utils_http.encode(utils_collection.ListMultimap(service = urllib.quote_plus(redirectServiceUrl)))
-    
-    utils_log.log_url( log, 'Granting user for service\t', url_ticket +'?'+opts )    
-    url_config['data']=opts
-    ticket = utils_http.open_url(url_ticket, **url_config).readline() 
-    
-    utils_log.log_url( log, "found service ticket:\t", ticket)
-    
+    utils_log.log_url(log, "found url ticket:\t", url_ticket)
+
+    opts = utils_http.encode(utils_collection.ListMultimap(service=quote_plus(redirect_service_url)))
+
+    utils_log.log_url(log, 'Granting user for service\t', url_ticket + '?' + opts)
+    url_config['data'] = opts
+    ticket = utils_http.open_url(url_ticket, **url_config).readline().decode("utf-8")
+
+    utils_log.log_url(log, "found service ticket:\t", ticket)
+
     # we append the download url with the ticket and return the result  
-    service_url = redirectServiceUrl + '&ticket=' + ticket
-    
-    utils_log.log_url( log, "service url is:\t",service_url)
-      
-    return service_url
+    service_url = redirect_service_url + '&ticket=' + ticket
 
-    
+    utils_log.log_url(log, "service url is:\t", service_url)
+
+    return service_url

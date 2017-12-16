@@ -1,3 +1,15 @@
 /target/
 *.pyc
 *.py-path
+
+# IDE
+.idea/
+
+# Don't put this ini in the repo if someone adds his password
+bin/motu-client-python.ini
+
+# The download directory
+bin/out_dir/
+
+# Cache
+motu/__pycache__/

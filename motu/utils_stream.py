@@ -26,31 +26,26 @@
 #  along with this library; if not, write to the Free Software Foundation,
 #  Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-import os
 
-_messages = None
+def copy(source_handler, dest_handler, callback=None, block_size=65535):
+    """Copy the available content through the given handler to another one. Process
+    can be monitored with the (optional) callback function.
+    
+    sourceHandler: the handler through witch downloading content
+    destHandler: the handler into which writing data        
+    callback: the callback function called for each block read. Signature: f: sizeRead -> void
+    blockSize: the size of the block used to read data
+    
+    returns the total size read
+    """
 
-MESSAGES_FILE = '../etc/messages.properties'
+    read = 0
+    while 1:
+        block = source_handler.read(block_size)
+        if block == b"":
+            break
+        read += len(block)
+        dest_handler.write(block)
+        callback(read)
 
-def get_external_messages():
-    """Return a table of externalized messages.
-        
-    The table is lazzy instancied (loaded once when called the first time)."""
-    global _messages
-    if _messages is None:
-        propFile= file( os.path.join(os.path.dirname(__file__),MESSAGES_FILE), "rU" )
-        propDict= dict()
-        for propLine in propFile:
-            propDef= propLine.strip()
-            if len(propDef) == 0:
-                continue
-            if propDef[0] in ( '!', '#' ):
-                continue
-            punctuation= [ propDef.find(c) for c in ':= ' ] + [ len(propDef) ]
-            found= min( [ pos for pos in punctuation if pos != -1 ] )
-            name= propDef[:found].rstrip()
-            value= propDef[found:].lstrip(":= ").rstrip()
-            propDict[name]= value
-        propFile.close()
-        _messages = propDict
-    return _messages
+    return read
