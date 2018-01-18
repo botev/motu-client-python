@@ -59,10 +59,13 @@ class StopWatch(object):
         """Stops the clock for the given counter.
         Returns the time at which the instance was stopped.
         """
-        self.times[label] = self.elapsed(label)
-        del self.timers[label]
+        if self.timers.get(label) is not None:
+            self.times[label] = self.elapsed(label)
+            del self.timers[label]
 
-        return self.times[label]
+            return self.times[label]
+        else:
+            return None
 
     def is_running(self, label=GLOBAL):
         return label in self.timers

@@ -56,9 +56,6 @@ AUTHENTICATION_MODE_CAS = 'cas'
 # constant for date time string format
 DATETIME_FORMAT = "%Y-%m-%d% %H:%M:%S"
 
-# shared logger
-log = None
-
 
 def get_client_version():
     """Return the version (as a string) of this client.
@@ -82,7 +79,7 @@ def build_params(_options):
     # geographic = ''
     # vertical = ''
     # other_opt = ''
-
+    log = logging.getLogger("motu_api")
     """
     Build the main url to connect to
     """
@@ -338,6 +335,7 @@ def get_url_config(_options, data=None):
 
 def get_request_url(dl_url, server, **options):
     """ Get the request url."""
+    log = logging.getLogger("motu_api")
     stop_wa = stop_watch.local_thread_stop_watch()
     start_time = datetime.datetime.now()
     stop_wa.start('get_request')
@@ -377,7 +375,7 @@ def dl_2_file(dl_url, fh, block_size=65535, isADownloadRequest=None, **options):
     
     dl_url: the complete download url of Motu
     fh: file handler to use to write the downstream"""
-
+    log = logging.getLogger("motu_api")
     stop_wa = stop_watch.local_thread_stop_watch()
     start_time = datetime.datetime.now()
     log.info("Downloading file (this can take a while)...")
@@ -531,15 +529,13 @@ def execute_request(_options):
       - user_agent: 'motu-api-client' 
 
     """
-    global log
     global init_time
 
+    log = logging.getLogger("motu_api")
     init_time = datetime.datetime.now()
     stop_wa = stop_watch.local_thread_stop_watch()
     stop_wa.start()
     try:
-        log = logging.getLogger("motu_api")
-
         # at first, we check given options are ok
         check_options(_options)
 
