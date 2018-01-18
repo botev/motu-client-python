@@ -13,3 +13,7 @@ bin/out_dir/
 
 # Cache
 motu/__pycache__/
+
+# Jupyer
+.ipynb_checkpoints/
+Untitled.ipynb

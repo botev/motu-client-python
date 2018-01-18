@@ -52,7 +52,7 @@ CFG_FILE = './motu-client-python.ini'
 LOG_CFG_FILE = './log.ini'
 
 # project libraries path
-LIBRARIES_PATH = os.path.join(os.path.dirname(__file__), './motu')
+# LIBRARIES_PATH = os.path.join(os.path.dirname(__file__), './motu')
 
 SECTION = 'Main'
 
@@ -269,7 +269,7 @@ def check_version():
                     cur_version[1] >= REQUIRED_VERSION[1]):
         return
     else:
-        raise Exception( "This tool uses python 2.7 or greater. You version is %s. " % str(cur_version))
+        raise Exception("This tool uses python 2.7 or greater. You version is %s. " % str(cur_version))
 
 
 #===============================================================================

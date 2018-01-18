@@ -34,6 +34,7 @@ import re
 import datetime
 import time
 import socket
+from math import ceil
 from xml.dom import minidom
 
 # Import project libraries
@@ -603,6 +604,7 @@ def execute_request(_options):
             else:
                 stop_wa.start('wait_request')
                 request_url = get_request_url(download_url, url_service, **url_config)
+                skip = False
 
                 if request_url is not None:
                     # asynchronous mode
@@ -641,8 +643,38 @@ def execute_request(_options):
                             break
 
                     if status == "2":
-                        log.error(msg)
-                    if status == "1":
+                        if msg.startswith("004-7 : The result file size"):
+                            import xarray as xr
+                            log.info(msg)
+                            sizes = re.findall(r"[1-9][0-9]*.[0-9]+MBytes", msg, flags=0)
+                            requested_size = float(sizes[0][:-6])
+                            allowed_size = float(sizes[1][:-6])
+                            parts = int(ceil(requested_size / allowed_size))
+                            log.info("Downloading by {} parts.".format(parts))
+                            date_min = datetime.datetime.strptime(_options.date_min, '%Y-%m-%d')
+                            date_max = datetime.datetime.strptime(_options.date_max, '%Y-%m-%d')
+                            date_delta = (date_max - date_min) // parts
+                            dates = list()
+                            for i in range(parts - 1):
+                                dates.append((date_min.strftime('%Y-%m-%d'),
+                                              (date_min + date_delta).strftime('%Y-%m-%d')))
+                                date_min += date_delta + datetime.timedelta(days=1)
+                                log.info("Part {}: {} - {}".format(i + 1, dates[-1][0], dates[-1][1]))
+                            dates.append((date_min.strftime('%Y-%m-%d'), date_max.strftime('%Y-%m-%d')))
+                            log.info("Part {}: {} - {}".format(parts, dates[-1][0], dates[-1][1]))
+                            base_name, extension = os.path.splitext(_options.out_name)
+                            # Download each part
+                            for i, (dmin, dmax) in enumerate(dates):
+                                log.info("Downloading part {}".format(i + 1))
+                                _options.out_name = base_name + "_" + str(i) + extension
+                                _options.date_min = dmin
+                                _options.date_max = dmax
+                                execute_request(_options)
+                            skip = True
+                        else:
+                            log.error(msg)
+                            raise Exception(msg)
+                    elif status == "1":
                         log.info('The product is ready for download')
                         if dwurl != "":
                             dl_2_file(dwurl, fh, _options.block_size, not (_options.describe or _options.size),
@@ -650,9 +682,8 @@ def execute_request(_options):
                             log.info("Done")
                         else:
                             log.error("Couldn't retrieve file")
-
-                stop_wa.stop('wait_request')
-
+                if not skip:
+                    stop_wa.stop('wait_request')
         except Exception:
             try:
                 if os.path.isfile(fh):
